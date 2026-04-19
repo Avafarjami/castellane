@@ -3,120 +3,64 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Ground Memorial - Final Version</title>
+    <title>Universal AR Ground</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; }
         #overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 9999; display: flex;
-            flex-direction: column; align-items: center; justify-content: center; color: white;
-        }
-        #ui {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; width: 85%; display: none; background: rgba(255,255,255,0.9);
-            padding: 15px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-        }
-        button#start-btn { 
-            padding: 18px 36px; font-size: 18px; border-radius: 12px; 
-            background: #2196F3; color: white; border: none; font-weight: bold;
-        }
-        input { 
-            width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; 
-            border: 1px solid #ccc; box-sizing: border-box; font-size: 16px;
-        }
-        #add-btn { 
-            width: 100%; padding: 12px; background: #000; color: white; 
-            border-radius: 8px; border: none; font-weight: bold; 
-        }
-        #status-msg {
-            position: absolute; top: 10px; width: 100%; text-align: center;
-            color: black; background: rgba(255,255,255,0.7); z-index: 1000; font-size: 12px;
+            z-index: 1000; background: rgba(0,0,0,0.8); color: white;
+            padding: 15px 25px; border-radius: 30px; font-family: sans-serif;
+            border: none; cursor: pointer; font-size: 16px;
         }
     </style>
 </head>
+<body style="margin: 0; overflow: hidden;">
 
-<body>
-    <div id="overlay">
-        <button id="start-btn">شروع تجربه واقعیت افزوده</button>
-        <p style="margin-top: 20px; font-size: 13px;">پس از ورود، به زمین نگاه کنید</p>
-    </div>
-
-    <div id="status-msg" style="display:none;">در حال جستجوی پیام‌های روی زمین...</div>
-
-    <div id="ui">
-        <input type="text" id="msgInput" placeholder="پیام خود را برای حک شدن بنویسید...">
-        <button id="add-btn">حک کردن پیام روی زمین</button>
-    </div>
+    <button id="overlay" onclick="placeSquare()">کاشت مربع ۱ در ۱ متر</button>
 
     <a-scene 
         embedded 
         arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
         vr-mode-ui="enabled: false">
         
-        <a-camera gps-camera rotation-reader></a-camera>
+        <a-entity camera look-controls cursor="rayOrigin: mouse"></a-entity>
 
-        <a-text 
-            value="I WAS HERE" 
-            align="center" 
-            color="red"
-            scale="4 4 4"
-            rotation="-90 0 0"
-            gps-entity-place="latitude: 43.28585; longitude: 5.38405;">
-        </a-text>
+        <a-entity id="anchor"></a-entity>
 
     </a-scene>
 
     <script>
-        const startBtn = document.getElementById('start-btn');
-        const overlay = document.getElementById('overlay');
-        const ui = document.getElementById('ui');
-        const statusMsg = document.getElementById('status-msg');
-
-        startBtn.onclick = () => {
-            // تایید سنسورهای حرکتی آیفون
+        function placeSquare() {
+            // اجازه دسترسی به سنسورها در آیفون
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().then(permission => {
-                    console.log('Sensors Permission:', permission);
-                });
+                DeviceOrientationEvent.requestPermission().catch(console.error);
             }
-            overlay.style.display = 'none';
-            ui.style.display = 'block';
-            statusMsg.style.display = 'block';
-        };
 
-        document.getElementById('add-btn').onclick = () => {
-            const val = document.getElementById('msgInput').value;
-            if (!val) return;
+            const anchor = document.getElementById('anchor');
+            
+            // اگر قبلاً ساخته شده، حذفش کن تا دوباره در نقطه جدید ساخته شود
+            anchor.innerHTML = '';
 
-            statusMsg.innerText = "در حال دریافت مختصات GPS...";
+            // ایجاد مربع ۱ در ۱ متر
+            const square = document.createElement('a-plane');
+            
+            square.setAttribute('width', '1');
+            square.setAttribute('height', '1');
+            square.setAttribute('color', '#007bff');
+            square.setAttribute('material', 'opacity: 0.6; transparent: true; side: double');
+            
+            // خواباندن روی زمین (۹۰ درجه چرخش)
+            square.setAttribute('rotation', '-90 0 0');
+            
+            // قرار دادن در فاصله ۲ متری جلو و کمی پایین‌تر از سطح چشم (که روی زمین به نظر برسد)
+            square.setAttribute('position', '0 -1.5 -2');
 
-            navigator.geolocation.getCurrentPosition((pos) => {
-                const lat = pos.coords.latitude + 0.00008; // حدود ۸ متر جلوتر از کاربر
-                const lon = pos.coords.longitude;
-
-                const scene = document.querySelector('a-scene');
-                const entity = document.createElement('a-text');
-                
-                // تنظیمات متن چسبیده به زمین
-                entity.setAttribute('value', val);
-                entity.setAttribute('align', 'center');
-                entity.setAttribute('color', 'black');
-                entity.setAttribute('rotation', '-90 0 0'); // خواباندن روی زمین
-                entity.setAttribute('scale', '3.5 3.5 3.5'); // سایز ظریف و انسانی
-                entity.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-
-                scene.appendChild(entity);
-                
-                document.getElementById('msgInput').value = "";
-                statusMsg.innerText = "پیام روی زمین حک شد! به سمت جلو نگاه کنید.";
-                
-                setTimeout(() => { statusMsg.innerText = "در حال اسکن محیط..."; }, 3000);
-            }, (err) => {
-                alert("GPS Error: " + err.message);
-            }, {enableHighAccuracy: true});
-        };
+            anchor.appendChild(square);
+            
+            document.getElementById('overlay').innerText = "مربع قفل شد. دور گوشی بچرخید.";
+        }
     </script>
 </body>
 </html>
