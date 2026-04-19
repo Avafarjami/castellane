@@ -1,3 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>AR Ground Square</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --accent: #00d4ff;
+      --accent2: #0066ff;
+      --bg: #07090f;
+      --surface: #0e1218;
+      --border: rgba(255,255,255,0.08);
+      --text: #e8eaf0;
+      --muted: #5a6070;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Landing screen ── */
+    #landing {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem;
+      gap: 0;
+      position: relative;
+    }
+
+    .grid-bg {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+    }
+
+    .square-preview {
+      width: 120px; height: 120px;
+      border: 1.5px solid var(--accent);
+      position: relative;
+      margin-bottom: 2.5rem;
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    .square-preview::before, .square-preview::after {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      border-color: white;
+      border-style: solid;
+    }
+    .square-preview::before { top: -3px; left: -3px; border-width: 2px 0 0 2px; }
+    .square-preview::after  { bottom: -3px; right: -3px; border-width: 0 2px 2px 0; }
+
+    .inner-dot {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .inner-dot::after {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0,212,255,0.3), inset 0 0 0 0 rgba(0,212,255,0.05); }
+      50%       { box-shadow: 0 0 32px 4px rgba(0,212,255,0.12), inset 0 0 40px rgba(0,212,255,0.07); }
+    }
+
+    h1 {
+      font-family: 'DM Mono', monospace;
+      font-size: clamp(1.1rem, 5vw, 1.5rem);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0.6rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 2.5rem;
+      text-align: center;
+    }
+
+    #launch-btn {
+      position: relative;
+      padding: 14px 36px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--bg);
+      background: var(--accent);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 0.01em;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    #launch-btn:active { transform: scale(0.97); }
+    #launch-btn:hover  { box-shadow: 0 0 24px rgba(0,212,255,0.4); }
+
+    /* iOS anchor tag trick */
+    #ios-link {
+      display: none;
+      position: relative;
+      padding: 14px 36px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--bg);
+      background: var(--accent);
+      border-radius: 4px;
+      text-decoration: none;
+      letter-spacing: 0.01em;
+    }
+    #ios-link[rel~="ar"] > img {
+      /* required by Safari — hidden 1px image */
+      width: 1px; height: 1px;
+      position: absolute; opacity: 0;
+    }
+
+    .platform-tag {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--muted);
+    }
+    .platform-tag span {
+      color: var(--accent);
+    }
+
+    /* ── Status overlay (Android WebXR) ── */
+    #overlay {
+      position: fixed; inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 48px;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #overlay.active { display: flex; }
+
+    #status-box {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      color: white;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 10px 20px;
+      border-radius: 40px;
+      text-align: center;
+      max-width: 300px;
+      margin-bottom: 16px;
+      pointer-events: none;
+    }
+
+    #exit-btn {
+      pointer-events: all;
+      padding: 10px 28px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 40px;
+      cursor: pointer;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      position: fixed; inset: 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Landing -->
+<div id="landing">
+  <div class="grid-bg"></div>
+
+  <div class="square-preview">
+    <div class="inner-dot"></div>
+  </div>
+
+  <h1>AR Ground Square</h1>
+  <p class="subtitle">1 × 1 meter · locked to floor</p>
+
+  <!-- Android button -->
+  <button id="launch-btn" style="display:none">Launch AR</button>
+
+  <!-- iOS Quick Look anchor (Safari requirement: must be <a rel="ar">) -->
+  <a id="ios-link" rel="ar" href="square.usdz">
+    <img src="" alt="">
+    Launch AR
+  </a>
+
+  <p class="platform-tag" id="platform-label">detecting device…</p>
+</div>
+
+<!-- Android WebXR overlay -->
+<div id="overlay">
+  <div id="status-box">point camera at the floor</div>
+  <button id="exit-btn">Exit AR</button>
+</div>
+
+<div id="canvas-container"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ── Device detection ── */
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+const platformLabel = document.getElementById('platform-label');
+const launchBtn     = document.getElementById('launch-btn');
+const iosLink       = document.getElementById('ios-link');
+
+if (isIOS) {
+  iosLink.style.display = 'inline-block';
+  platformLabel.innerHTML = 'iOS · <span>Quick Look</span>';
+} else {
+  launchBtn.style.display = 'inline-block';
+  platformLabel.innerHTML = 'Android · <span>WebXR</span>';
+  launchBtn.addEventListener('click', startWebXR);
+}
+
+/* ══════════════════════════════════════════
+   ANDROID — WebXR
+══════════════════════════════════════════ */
+let camera, scene, renderer;
+let hitTestSource = null;
+let localSpace    = null;
+let anchor        = null;
+let reticle       = null;
+let squareMesh    = null;
+let xrSession     = null;
+let placed        = false;
+
+const overlay    = document.getElementById('overlay');
+const statusBox  = document.getElementById('status-box');
+const exitBtn    = document.getElementById('exit-btn');
+
+exitBtn.addEventListener('click', () => { if (xrSession) xrSession.end(); });
+
+function initThree() {
+  scene    = new THREE.Scene();
+  camera   = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.01, 30);
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(devicePixelRatio);
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.xr.enabled = true;
+  renderer.setClearColor(0x000000, 0);
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+  const d = new THREE.DirectionalLight(0xffffff, 1.5);
+  d.position.set(1, 3, 1);
+  scene.add(d);
+
+  /* Reticle */
+  reticle = new THREE.Group();
+  reticle.add(new THREE.Mesh(
+    new THREE.RingGeometry(0.07, 0.09, 32),
+    new THREE.MeshBasicMaterial({ color: 0x00d4ff, side: THREE.DoubleSide })
+  ));
+  reticle.add(new THREE.Mesh(
+    new THREE.CircleGeometry(0.018, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  ));
+  reticle.rotation.x = -Math.PI / 2;
+  reticle.visible = false;
+  scene.add(reticle);
+
+  /* 1×1 m square */
+  squareMesh = buildSquare();
+  squareMesh.visible = false;
+  scene.add(squareMesh);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+}
+
+function buildSquare() {
+  const g = new THREE.Group();
+
+  /* Fill */
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshStandardMaterial({
+      color: 0x00aaff, transparent: true,
+      opacity: 0.22, side: THREE.DoubleSide, depthWrite: false
+    })
+  );
+  fill.rotation.x = -Math.PI / 2;
+  g.add(fill);
+
+  /* Edges */
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(1, 1)),
+    new THREE.LineBasicMaterial({ color: 0x00d4ff, linewidth: 2 })
+  );
+  edges.rotation.x = -Math.PI / 2;
+  g.add(edges);
+
+  /* Corner marks */
+  const cMat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 });
+  const L = 0.1, H = 0.5;
+  [[-H,-H],[H,-H],[-H,H],[H,H]].forEach(([x,z]) => {
+    const dx = x > 0 ? -L : L, dz = z > 0 ? -L : L;
+    [[x,z,x+dx,z],[x,z,x,z+dz]].forEach(([x1,z1,x2,z2]) => {
+      const ln = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x1,0,z1), new THREE.Vector3(x2,0,z2)
+        ]), cMat
+      );
+      ln.rotation.x = -Math.PI / 2;
+      g.add(ln);
+    });
+  });
+
+  g.position.y = 0.002;
+  return g;
+}
+
+async function startWebXR() {
+  if (!navigator.xr) return alert('WebXR not supported on this browser.');
+  if (!await navigator.xr.isSessionSupported('immersive-ar')) return alert('AR not supported on this device.');
+
+  document.getElementById('landing').style.display = 'none';
+  overlay.classList.add('active');
+  initThree();
+
+  try {
+    xrSession = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test', 'local-floor'],
+      optionalFeatures: ['anchors', 'dom-overlay'],
+      domOverlay: { root: overlay }
+    });
+
+    renderer.xr.setReferenceSpaceType('local-floor');
+    await renderer.xr.setSession(xrSession);
+    xrSession.addEventListener('end', onEnd);
+
+    localSpace = await xrSession.requestReferenceSpace('local-floor');
+    const viewerSpace = await xrSession.requestReferenceSpace('viewer');
+    hitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
+
+    document.addEventListener('click', onTap);
+    renderer.setAnimationLoop(onFrame);
+
+  } catch (e) {
+    alert('Error: ' + e.message);
+    onEnd();
+  }
+}
+
+function onTap() {
+  if (!reticle.visible || placed) return;
+  placed = true;
+
+  const pos = new THREE.Vector3();
+  reticle.getWorldPosition(pos);
+  squareMesh.position.set(pos.x, 0, pos.z);
+  squareMesh.visible = true;
+  reticle.visible = false;
+
+  /* Try to create an anchor for world-locked stability */
+  if (xrSession && xrSession.createAnchor) {
+    const frame = renderer.xr.getFrame();
+    if (frame) {
+      frame.createAnchor(
+        new XRRigidTransform({ x: pos.x, y: 0, z: pos.z, w: 1 }, { x:0,y:0,z:0,w:1 }),
+        localSpace
+      ).then(a => {
+        anchor = a;
+        statusBox.textContent = 'square locked ✓ — move freely';
+      }).catch(() => {
+        statusBox.textContent = 'square placed — move freely';
+      });
+    }
+  } else {
+    statusBox.textContent = 'square placed — move freely';
+  }
+}
+
+const _mat4 = new THREE.Matrix4();
+
+function onFrame(ts, frame) {
+  if (!frame) return;
+
+  /* Hit-test for reticle */
+  if (!placed && hitTestSource) {
+    const hits = frame.getHitTestResults(hitTestSource);
+    if (hits.length) {
+      const pose = hits[0].getPose(localSpace);
+      if (pose) {
+        reticle.visible = true;
+        _mat4.fromArray(pose.transform.matrix);
+        reticle.position.setFromMatrixPosition(_mat4);
+      }
+    } else {
+      reticle.visible = false;
+    }
+  }
+
+  /* Update square from anchor if available */
+  if (anchor && frame.trackedAnchors && frame.trackedAnchors.has(anchor)) {
+    const ap = frame.getPose(anchor.anchorSpace, localSpace);
+    if (ap) {
+      _mat4.fromArray(ap.transform.matrix);
+      squareMesh.position.setFromMatrixPosition(_mat4);
+      squareMesh.position.y = 0;
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+function onEnd() {
+  xrSession = null; anchor = null;
+  hitTestSource = null; placed = false;
+  renderer.setAnimationLoop(null);
+  overlay.classList.remove('active');
+  document.getElementById('landing').style.display = 'flex';
+  document.removeEventListener('click', onTap);
+}
+</script>
+</body>
+</html>
 
 <html lang="fa">
 <head>
