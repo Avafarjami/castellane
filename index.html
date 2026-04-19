@@ -2,65 +2,43 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Universal AR Ground</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fixed AR Square</title>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; }
-        #overlay {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; background: rgba(0,0,0,0.8); color: white;
-            padding: 15px 25px; border-radius: 30px; font-family: sans-serif;
-            border: none; cursor: pointer; font-size: 16px;
+        body { margin: 0; background: #f0f0f0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
+        model-viewer { width: 100%; height: 80vh; background-color: #eee; }
+        .controls { padding: 20px; text-align: center; }
+        #ar-button {
+            background-color: #007bff; color: white; border: none;
+            padding: 15px 30px; border-radius: 30px; font-size: 18px; font-weight: bold;
         }
     </style>
 </head>
-<body style="margin: 0; overflow: hidden;">
+<body>
 
-    <button id="overlay" onclick="placeSquare()">کاشت مربع ۱ در ۱ متر</button>
+    <div class="controls">
+        <h2>پروژه مربع ۱ در ۱</h2>
+        <p>روی دکمه زیر بزنید و گوشی را به سمت زمین بگیرید</p>
+    </div>
 
-    <a-scene 
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
-        vr-mode-ui="enabled: false">
+    <model-viewer 
+        src="https://modelviewer.dev/shared-assets/models/glTFSampleModels/Square/Square.gltf" 
+        ar 
+        ar-modes="webxr scene-viewer quick-look" 
+        camera-controls 
+        shadow-intensity="1" 
+        alt="A 1x1 meter square">
         
-        <a-entity camera look-controls cursor="rayOrigin: mouse"></a-entity>
+        <button slot="ar-button" id="ar-button">
+            مشاهده در محیط شما (AR)
+        </button>
 
-        <a-entity id="anchor"></a-entity>
+    </model-viewer>
 
-    </a-scene>
+    <div style="padding: 20px; font-size: 12px; color: #666;">
+        نکته: در آیفون، بعد از زدن دکمه، دوربین باز می‌شود؛ گوشی را کمی تکان دهید تا زمین را بشناسد.
+    </div>
 
-    <script>
-        function placeSquare() {
-            // اجازه دسترسی به سنسورها در آیفون
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().catch(console.error);
-            }
-
-            const anchor = document.getElementById('anchor');
-            
-            // اگر قبلاً ساخته شده، حذفش کن تا دوباره در نقطه جدید ساخته شود
-            anchor.innerHTML = '';
-
-            // ایجاد مربع ۱ در ۱ متر
-            const square = document.createElement('a-plane');
-            
-            square.setAttribute('width', '1');
-            square.setAttribute('height', '1');
-            square.setAttribute('color', '#007bff');
-            square.setAttribute('material', 'opacity: 0.6; transparent: true; side: double');
-            
-            // خواباندن روی زمین (۹۰ درجه چرخش)
-            square.setAttribute('rotation', '-90 0 0');
-            
-            // قرار دادن در فاصله ۲ متری جلو و کمی پایین‌تر از سطح چشم (که روی زمین به نظر برسد)
-            square.setAttribute('position', '0 -1.5 -2');
-
-            anchor.appendChild(square);
-            
-            document.getElementById('overlay').innerText = "مربع قفل شد. دور گوشی بچرخید.";
-        }
-    </script>
 </body>
 </html>
