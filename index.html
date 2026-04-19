@@ -2,87 +2,68 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>AR Location Fix</title>
+    <title>AR Test - Castellane</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #ui {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; width: 85%; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 15px;
-        }
-        input { width: 100%; padding: 12px; box-sizing: border-box; border-radius: 8px; border: none; font-size: 16px; margin-bottom: 10px; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; }
-        #debug { position: absolute; top: 10px; left: 10px; color: yellow; background: rgba(0,0,0,0.5); font-size: 10px; z-index: 1001; pointer-events: none; }
-    </style>
 </head>
 
-<body>
-    <div id="debug">System Status: Waiting...</div>
-
-    <div id="ui">
-        <input type="text" id="msgInput" placeholder="پیام خود را بنویسید...">
-        <button id="addBtn">ثبت و نمایش پیام در ۵ متری</button>
+<body style="margin: 0; overflow: hidden;">
+    <div style="position: absolute; top: 10px; width: 100%; text-align: center; z-index: 100; color: black; background: white; padding: 5px; font-size: 12px;">
+        اگر متن را نمی‌بینید، ۳۶۰ درجه دور خود بچرخید
     </div>
 
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; videoTexture: true;">
+        arjs="sourceType: webcam; debugUIEnabled: false;">
         
         <a-camera gps-camera="minDistance: 1; maxDistance: 1000;" rotation-reader></a-camera>
+
+        <a-box 
+            gps-entity-place="latitude: 43.28585; longitude: 5.38405;" 
+            scale="10 10 10" 
+            material="color: white; opacity: 0.8">
+            <a-text 
+                value="I was here" 
+                align="center" 
+                color="black" 
+                width="15"
+                position="0 0 1"
+                look-at="[gps-camera]">
+            </a-text>
+        </a-box>
+
+        <a-entity id="auto-text-container"></a-entity>
+
     </a-scene>
 
     <script>
-        const debug = document.getElementById('debug');
-        const addBtn = document.getElementById('addBtn');
-        const msgInput = document.getElementById('msgInput');
-
-        // فعال‌سازی سنسورها برای آیفون
-        window.onclick = () => {
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().then(res => {
-                    debug.innerText = "Sensors: " + res;
-                });
-            }
+        // بلافاصله بعد از گرفتن موقعیت، یک متن در نزدیکی کاربر می‌سازد
+        window.onload = () => {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lat = pos.coords.latitude + 0.0001; // کمی متمایل به شمال (حدود ۱۰ متر)
+                const lon = pos.coords.longitude;
+                
+                const container = document.getElementById('auto-text-container');
+                const entity = document.createElement('a-entity');
+                
+                entity.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+                entity.innerHTML = `
+                    <a-box scale="5 5 5" material="color: white">
+                        <a-text value="NEAR YOU" align="center" color="black" width="20" position="0 0 0.6" look-at="[gps-camera]"></a-text>
+                    </a-box>
+                `;
+                container.appendChild(entity);
+                console.log("پیام نزدیک شما کاشته شد در: ", lat, lon);
+            });
         };
 
-        addBtn.onclick = () => {
-            const text = msgInput.value;
-            if (!text) return;
-
-            debug.innerText = "Getting GPS...";
-
-            navigator.geolocation.getCurrentPosition((pos) => {
-                // دریافت مختصات فعلی
-                let lat = pos.coords.latitude;
-                let lon = pos.coords.longitude;
-
-                // ترفند فنی: اضافه کردن مقدار کمی به مختصات برای اینکه پیام ۵ متر جلوتر بیفتد
-                // این کار باعث می‌شود پیام بلافاصله در دید دوربین ظاهر شود
-                const offset = 0.00005; 
-                lat += offset;
-
-                const scene = document.querySelector('a-scene');
-                const entity = document.createElement('a-text');
-                
-                entity.setAttribute('value', text);
-                entity.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-                entity.setAttribute('look-at', '[gps-camera]');
-                entity.setAttribute('color', '#00FF00');
-                entity.setAttribute('align', 'center');
-                entity.setAttribute('scale', '15 15 15'); // اندازه متوسط
-
-                scene.appendChild(entity);
-                
-                debug.innerText = `Placed at: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-                msgInput.value = "";
-                
-            }, (err) => {
-                debug.innerText = "GPS Error: " + err.message;
-                alert("لطفاً اجازه دسترسی به Location را در تنظیمات مرورگر بدهید.");
-            }, { enableHighAccuracy: true });
+        // اجازه دسترسی برای آیفون
+        window.onclick = () => {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission();
+            }
         };
     </script>
 </body>
