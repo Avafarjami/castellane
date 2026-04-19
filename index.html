@@ -2,13 +2,42 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>AR Memorial - Clean Look</title>
+    <title>AR Memorial - Live Writing</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        /* پنل ثبت پیام پایین صفحه */
+        #ui-panel {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; background: rgba(255, 255, 255, 0.9); padding: 15px;
+            border-radius: 20px; display: flex; flex-direction: column; width: 85%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        input { 
+            padding: 12px; border: 1px solid #ccc; border-radius: 10px; 
+            margin-bottom: 10px; font-size: 16px; outline: none;
+        }
+        button { 
+            padding: 12px; background: #000; color: white; border: none; 
+            border-radius: 10px; font-weight: bold; cursor: pointer;
+        }
+        #info {
+            position: absolute; top: 10px; width: 100%; text-align: center;
+            color: black; background: rgba(255,255,255,0.7); z-index: 1000; font-size: 12px;
+        }
+    </style>
 </head>
 
-<body style="margin: 0; overflow: hidden;">
+<body>
+    <div id="info">در حال اسکن GPS... برای فعال‌سازی سنسورها یکبار روی صفحه بزنید</div>
+
+    <div id="ui-panel">
+        <input type="text" id="user-msg" placeholder="پیام خود را بنویسید...">
+        <button id="post-btn">ثبت پیام در ۳۰ متری</button>
+    </div>
+
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded 
@@ -25,30 +54,12 @@
             gps-entity-place="latitude: 43.28585; longitude: 5.38405;">
         </a-text>
 
-        <a-entity id="auto-text-container"></a-entity>
-
     </a-scene>
 
     <script>
-        window.onload = () => {
-            navigator.geolocation.getCurrentPosition((pos) => {
-                // ۳۰ متر فاصله برای اینکه متن مستقیماً توی صورت نباشد
-                const lat = pos.coords.latitude + 0.0003; 
-                const lon = pos.coords.longitude;
-                
-                const container = document.getElementById('auto-text-container');
-                const entity = document.createElement('a-text');
-                
-                entity.setAttribute('value', "NEAR YOU");
-                entity.setAttribute('align', 'center');
-                entity.setAttribute('color', 'black');
-                entity.setAttribute('scale', '30 30 30'); // سایز نصف شده نسبت به قبل
-                entity.setAttribute('look-at', '[gps-camera]');
-                entity.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-                
-                container.appendChild(entity);
-            }, null, { enableHighAccuracy: true });
-        };
+        const postBtn = document.getElementById('post-btn');
+        const userInp = document.getElementById('user-msg');
+        const info = document.getElementById('info');
 
         // اجازه سنسور برای آیفون
         window.onclick = () => {
@@ -56,6 +67,38 @@
                 DeviceOrientationEvent.requestPermission();
             }
         };
+
+        postBtn.addEventListener('click', () => {
+            const val = userInp.value;
+            if (!val) return;
+
+            info.innerText = "در حال دریافت موقعیت...";
+
+            navigator.geolocation.getCurrentPosition((pos) => {
+                // محاسبه نقطه در ۳۰ متری شمال کاربر
+                const lat = pos.coords.latitude + 0.0003; 
+                const lon = pos.coords.longitude;
+
+                const scene = document.querySelector('a-scene');
+                const newEl = document.createElement('a-text');
+                
+                newEl.setAttribute('value', val);
+                newEl.setAttribute('align', 'center');
+                newEl.setAttribute('color', 'black');
+                newEl.setAttribute('scale', '35 35 35'); // سایز ظریف
+                newEl.setAttribute('look-at', '[gps-camera]');
+                newEl.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+
+                scene.appendChild(newEl);
+                
+                userInp.value = "";
+                info.innerText = "پیام با موفقیت در هوا کاشته شد!";
+                setTimeout(() => { info.innerText = "آماده برای پیام بعدی"; }, 3000);
+
+            }, (err) => {
+                alert("GPS Error: " + err.message);
+            }, { enableHighAccuracy: true });
+        });
     </script>
 </body>
 </html>
