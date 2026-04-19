@@ -3,53 +3,51 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Ground Fix</title>
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <title>AR Ground Final Fix</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; }
+        body { margin: 0; overflow: hidden; background-color: #000; }
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 9999; display: flex;
+            background: #000; z-index: 999; display: flex;
             flex-direction: column; align-items: center; justify-content: center; color: white;
         }
         #ui {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; width: 85%; display: none;
+            z-index: 100; width: 85%; display: none; background: rgba(255,255,255,0.9);
+            padding: 15px; border-radius: 20px;
         }
-        button#start-btn { padding: 20px 40px; font-size: 18px; border-radius: 15px; border: none; background: #007bff; color: white; cursor: pointer; }
-        #add-btn { width: 100%; padding: 15px; background: white; color: black; border-radius: 10px; border: none; font-weight: bold; margin-top: 10px; }
-        input { width: 100%; padding: 15px; border-radius: 10px; border: none; box-sizing: border-box; }
+        button#start-btn { padding: 15px 30px; font-size: 18px; border-radius: 10px; background: #2196F3; color: white; border: none; }
+        input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+        #add-btn { width: 100%; padding: 12px; background: #000; color: white; border-radius: 8px; border: none; font-weight: bold; }
     </style>
 </head>
 
 <body>
     <div id="overlay">
-        <h2>پروژه یادمان</h2>
-        <p>برای فعال‌سازی دوربین و GPS کلیک کنید</p>
-        <button id="start-btn">شروع تجربه AR</button>
+        <button id="start-btn">فعال‌سازی و شروع</button>
+        <p style="font-size: 12px; margin-top: 10px;">اگر دوربین باز شد اما صفحه سیاه/سفید بود، یک لحظه صبر کنید</p>
     </div>
 
     <div id="ui">
-        <input type="text" id="msgInput" placeholder="متنی برای روی زمین...">
+        <input type="text" id="msgInput" placeholder="متن روی زمین...">
         <button id="add-btn">حک کردن روی زمین</button>
     </div>
 
     <a-scene 
-        vr-mode-ui="enabled: false"
         embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; videoTexture: true;"
-        renderer="logarithmicDepthBuffer: true;">
+        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
+        vr-mode-ui="enabled: false">
         
-        <a-camera gps-camera="minDistance: 1; maxDistance: 500;" rotation-reader></a-camera>
+        <a-camera gps-camera="simulateLatitude: 43.28585; simulateLongitude: 5.38405;" rotation-reader></a-camera>
 
         <a-text 
             value="I WAS HERE" 
-            align="center" 
-            color="white" 
-            width="10" 
+            scale="15 15 15"
+            color="red"
+            align="center"
             rotation="-90 0 0"
-            scale="10 10 10"
             gps-entity-place="latitude: 43.28585; longitude: 5.38405;">
         </a-text>
     </a-scene>
@@ -59,27 +57,22 @@
         const overlay = document.getElementById('overlay');
         const ui = document.getElementById('ui');
 
-        startBtn.onclick = async () => {
-            // ۱. درخواست اجازه سنسورهای حرکتی
+        startBtn.onclick = () => {
+            // تایید سنسورها
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try {
-                    const permission = await DeviceOrientationEvent.requestPermission();
-                    console.log('Sensor Permission:', permission);
-                } catch (err) {
-                    console.error(err);
-                }
+                DeviceOrientationEvent.requestPermission().then(permission => {
+                    console.log('Permission:', permission);
+                });
             }
-
-            // ۲. مخفی کردن پرده و نمایش رابط کاربری
             overlay.style.display = 'none';
             ui.style.display = 'block';
             
-            // ۳. تازه سازی سایز صفحه برای دوربین
-            window.dispatchEvent(new Event('resize'));
+            // اجبار به رندر مجدد برای جلوگیری از سفیدی صفحه
+            const scene = document.querySelector('a-scene');
+            scene.style.display = 'block';
         };
 
-        const addBtn = document.getElementById('add-btn');
-        addBtn.onclick = () => {
+        document.getElementById('add-btn').onclick = () => {
             const val = document.getElementById('msgInput').value;
             if (!val) return;
 
@@ -92,15 +85,14 @@
                 
                 entity.setAttribute('value', val);
                 entity.setAttribute('align', 'center');
-                entity.setAttribute('color', 'white'); // سفید روی زمین تیره بهتر دیده می‌شود
-                entity.setAttribute('width', '8');
+                entity.setAttribute('color', 'black');
                 entity.setAttribute('rotation', '-90 0 0');
                 entity.setAttribute('scale', '10 10 10');
                 entity.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
 
                 scene.appendChild(entity);
                 document.getElementById('msgInput').value = "";
-            }, (err) => alert("خطای مکان‌یابی: " + err.message), {enableHighAccuracy: true});
+            }, (err) => alert("GPS Error"), {enableHighAccuracy: true});
         };
     </script>
 </body>
