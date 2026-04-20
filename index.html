@@ -3,9 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Hidden Memories XR Clean</title>
+<title>Hidden Memories XR Fix</title>
 <style>
-html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#07090f;color:#fff;font-family:Arial,sans-serif}#landing{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#07090f;z-index:10}h1{margin:0;font-size:28px}button{padding:14px 28px;border:0;border-radius:10px;background:#00d4ff;color:#000;font-weight:700;font-size:16px}#status{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(0,0,0,.65);padding:10px 16px;border-radius:999px;z-index:20}canvas{position:fixed;inset:0}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:Arial,sans-serif}
+#landing{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#07090f;z-index:100}
+button{padding:14px 28px;border:0;border-radius:10px;background:#00d4ff;color:#000;font-weight:700;font-size:16px}
+#status{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(0,0,0,.65);padding:10px 16px;border-radius:999px;z-index:20;font-size:12px}
+#composer{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);display:none;z-index:30;background:rgba(0,0,0,.65);padding:8px;border-radius:999px}
+canvas{display: block;} /* اطمینان از نمایش کانواس */
 </style>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -13,18 +18,165 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 </head>
 <body>
 <div id="landing"><h1>Hidden Memories</h1><button id="enter">Enter AR</button></div>
-<div id="status">Ready</div><div id="composer" style="position:fixed;left:50%;bottom:70px;transform:translateX(-50%);display:none;z-index:30;background:rgba(0,0,0,.65);padding:8px;border-radius:999px"><input id="msg" maxlength="30" placeholder="leave memory" style="border:0;outline:none;padding:8px 12px;border-radius:999px"><button id="send">Send</button></div>
+<div id="status">Ready</div>
+<div id="composer">
+    <input id="msg" maxlength="30" placeholder="leave memory" style="border:0;outline:none;padding:8px 12px;border-radius:999px">
+    <button id="send">Send</button>
+</div>
+
 <script>
+// تنظیمات فایربیس بدون تغییر
 const firebaseConfig={apiKey:"AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",authDomain:"hidden-memories-27f1a.firebaseapp.com",projectId:"hidden-memories-27f1a",storageBucket:"hidden-memories-27f1a.firebasestorage.app",messagingSenderId:"61920134607",appId:"1:61920134607:web:e62e0b4b3f947985b6beba"};
 firebase.initializeApp(firebaseConfig);
 const db=firebase.firestore();
 const col=db.collection('messages');
-let scene,camera,renderer,session,reticle,viewerSpace,refSpace,hitTestSource,anchor;let placed=false;
+
+let scene,camera,renderer,session,reticle,refSpace,viewerSpace,hitTestSource,anchor;
+let placed=false;
+
 const landing=document.getElementById('landing');
 const statusEl=document.getElementById('status');
-function init3D(){scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.01,20);renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(window.devicePixelRatio||1);renderer.setSize(innerWidth,innerHeight);renderer.xr.enabled=true;document.body.appendChild(renderer.domElement);scene.add(new THREE.AmbientLight(0xffffff,2));reticle=new THREE.Mesh(new THREE.RingGeometry(.08,.1,32),new THREE.MeshBasicMaterial({color:0x00d4ff}));reticle.rotation.x=-Math.PI/2;reticle.visible=false;scene.add(reticle);anchor=new THREE.Group();scene.add(anchor);window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});}
-async function startAR(){try{if(typeof THREE==='undefined'){statusEl.textContent='Three.js failed';return;}if(!navigator.xr){statusEl.textContent='WebXR unsupported';return;}landing.style.display='none';statusEl.textContent='Starting AR...';init3D();session=await navigator.xr.requestSession('immersive-ar',{optionalFeatures:['local-floor','hit-test']});await renderer.xr.setSession(session);viewerSpace=await session.requestReferenceSpace('viewer');refSpace=await session.requestReferenceSpace('local');if(session.requestHitTestSource){hitTestSource=await session.requestHitTestSource({space:viewerSpace}).catch(()=>null);}session.addEventListener('end',()=>location.reload());document.addEventListener('click',placeZone);renderer.setAnimationLoop(loop);loadMessages();statusEl.textContent='Tap floor to place (or tap to place ahead)';}catch(err){statusEl.textContent='Error: '+err.message;landing.style.display='flex';}}
-function loop(t,frame){if(frame&&hitTestSource&&!placed){const hits=frame.getHitTestResults(hitTestSource);if(hits.length){const pose=hits[0].getPose(refSpace);if(pose){reticle.visible=true;reticle.position.set(pose.transform.position.x,pose.transform.position.y,pose.transform.position.z);}}}renderer.render(scene,camera);}function placeZone(e){if(!reticle.visible||placed)return;placed=true;if(reticle.visible){anchor.position.copy(reticle.position);}else{anchor.position.set(0,0,-0.6);}reticle.visible=false;document.getElementById('composer').style.display='block';statusEl.textContent='Memory anchored';}function loadMessages(){col.onSnapshot(s=>{anchor.clear();s.forEach(doc=>{const d=doc.data();const c=document.createElement('canvas');c.width=512;c.height=64;const x=c.getContext('2d');x.fillStyle='#fff';x.font='28px Arial';x.textAlign='center';x.fillText(d.text,256,40);const tex=new THREE.CanvasTexture(c);const m=new THREE.Mesh(new THREE.PlaneGeometry(.22,.04),new THREE.MeshBasicMaterial({map:tex,transparent:true}));m.rotation.x=-Math.PI/2;m.position.set(d.x||0,0.01,d.z||0);anchor.add(m);});});}document.getElementById('send').onclick=async()=>{if(!placed)return;const v=document.getElementById('msg').value.trim();if(!v)return;document.getElementById('msg').value='';await col.add({text:v,x:(Math.random()-.5)*0.6,z:(Math.random()-.5)*0.6,createdAt:firebase.firestore.FieldValue.serverTimestamp()});};
+
+function init3D(){
+    scene=new THREE.Scene();
+    camera=new THREE.PerspectiveCamera(70,window.innerWidth/window.innerHeight,0.01,20);
+    
+    // تنظیم آلفا و بک‌گراند برای جلوگیری از صفحه سیاه
+    renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth,window.innerHeight);
+    renderer.xr.enabled=true;
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff,2));
+
+    // نشانگر
+    reticle=new THREE.Mesh(new THREE.RingGeometry(.08,.1,32),new THREE.MeshBasicMaterial({color:0x00d4ff}));
+    reticle.rotation.x=-Math.PI/2;
+    reticle.visible=false;
+    scene.add(reticle);
+
+    anchor=new THREE.Group();
+    scene.add(anchor);
+
+    // اضافه کردن فرش ۱ متری برای تست بصری
+    const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(1,1),
+        new THREE.MeshBasicMaterial({color:0x00d4ff,transparent:true,opacity:0.2})
+    );
+    ground.rotation.x=-Math.PI/2;
+    anchor.add(ground);
+}
+
+async function startAR(){
+    try {
+        if(!navigator.xr){
+            statusEl.textContent='WebXR not found - use WebXR Viewer';
+            return;
+        }
+
+        // درخواست اجازه سنسور برای آیفون قبل از شروع سشن
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            await DeviceOrientationEvent.requestPermission();
+        }
+
+        init3D();
+
+        session = await navigator.xr.requestSession('immersive-ar', {
+            requiredFeatures: ['local-floor', 'hit-test']
+        });
+
+        renderer.xr.setReferenceSpaceType('local-floor');
+        await renderer.xr.setSession(session);
+        
+        refSpace = await session.requestReferenceSpace('local-floor');
+        viewerSpace = await session.requestReferenceSpace('viewer');
+        
+        hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+
+        landing.style.display='none';
+        statusEl.textContent='Scan floor...';
+
+        session.addEventListener('end',()=>location.reload());
+        
+        // تغییر از کلید کل صفحه به کلیک کنترل شده
+        renderer.domElement.addEventListener('click', placeZone);
+        
+        renderer.setAnimationLoop(loop);
+        loadMessages();
+
+    } catch (err) {
+        statusEl.textContent='Error: '+err.message;
+        console.error(err);
+    }
+}
+
+function loop(t,frame){
+    if(frame && hitTestSource && !placed){
+        const hits = frame.getHitTestResults(hitTestSource);
+        if(hits.length > 0){
+            const pose = hits[0].getPose(refSpace);
+            reticle.visible = true;
+            reticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+            reticle.updateMatrixWorld(true);
+        } else {
+            reticle.visible = false;
+        }
+    }
+    renderer.render(scene,camera);
+}
+
+function placeZone(){
+    if(placed || !reticle.visible) return;
+    placed=true;
+    anchor.position.copy(reticle.position);
+    reticle.visible=false;
+    document.getElementById('composer').style.display='block';
+    statusEl.textContent='Memory anchored (1x1m)';
+}
+
+function loadMessages(){
+    col.orderBy('createdAt','desc').limit(20).onSnapshot(s=>{
+        // پاک کردن پیام‌های قبلی به جز فرش آبی
+        for(let i = anchor.children.length - 1; i >= 1; i--) {
+            anchor.remove(anchor.children[i]);
+        }
+        
+        s.forEach(doc=>{
+            const d=doc.data();
+            const c=document.createElement('canvas');
+            c.width=512; c.height=64;
+            const x=c.getContext('2d');
+            x.fillStyle='#fff';
+            x.font='bold 32px Arial';
+            x.textAlign='center';
+            x.fillText(d.text, 256, 40);
+            
+            const tex=new THREE.CanvasTexture(c);
+            const m=new THREE.Mesh(
+                new THREE.PlaneGeometry(.3, .05),
+                new THREE.MeshBasicMaterial({map:tex,transparent:true,side:THREE.DoubleSide})
+            );
+            m.rotation.x=-Math.PI/2;
+            m.position.set(d.x || 0, 0.02, d.z || 0);
+            anchor.add(m);
+        });
+    });
+}
+
+document.getElementById('send').onclick=async()=>{
+    const msgInput = document.getElementById('msg');
+    const v=msgInput.value.trim();
+    if(!v) return;
+    msgInput.value='';
+    await col.add({
+        text:v,
+        x:(Math.random()-.5)*0.8,
+        z:(Math.random()-.5)*0.8,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+};
+
 document.getElementById('enter').addEventListener('click',startAR);
 </script>
 </body>
