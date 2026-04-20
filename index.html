@@ -1,29 +1,353 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Hidden Memories XR Viewer</title>
-<style>
-html,body{margin:0;height:100%;overflow:hidden;background:#07090f;color:#fff;font-family:Arial,sans-serif}#landing{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}button{padding:14px 28px;border:0;border-radius:8px;background:#00d4ff;color:#000;font-weight:700}#status{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:10px 16px;border-radius:999px}#input{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);display:none}.show{display:block}
-</style>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Hidden Memories</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #07090f; color: #fff; font-family: Arial, sans-serif; overflow: hidden; }
+
+    #landing {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 24px;
+    }
+    h1 { font-size: 1.4rem; letter-spacing: 0.05em; }
+    p  { color: #888; font-size: 0.85rem; }
+
+    #enter-btn {
+      padding: 14px 32px; border: none; border-radius: 8px;
+      background: #00d4ff; color: #000;
+      font-size: 1rem; font-weight: 700; cursor: pointer;
+    }
+
+    #ar-ui {
+      position: fixed; inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 36px;
+      pointer-events: none;
+      z-index: 999;
+    }
+    #ar-ui.active { display: flex; }
+
+    #status {
+      background: rgba(0,0,0,0.6);
+      padding: 8px 18px; border-radius: 999px;
+      font-size: 0.8rem; margin-bottom: 14px;
+      pointer-events: none;
+    }
+
+    #input-row {
+      display: none;
+      gap: 8px; align-items: center;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 999px;
+      padding: 8px 8px 8px 16px;
+      width: 88%; max-width: 340px;
+      margin-bottom: 12px;
+      pointer-events: all;
+    }
+    #input-row.show { display: flex; }
+    #msg-input {
+      flex: 1; background: transparent; border: none;
+      outline: none; color: #fff; font-size: 0.9rem;
+    }
+    #msg-input::placeholder { color: rgba(255,255,255,0.35); }
+    #send-btn {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: #00d4ff; border: none;
+      font-size: 1rem; cursor: pointer; flex-shrink: 0;
+    }
+
+    #exit-btn {
+      pointer-events: all;
+      padding: 8px 22px; border-radius: 999px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; font-size: 0.8rem; cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-<div id="landing"><h1>Hidden Memories</h1><button id="enter">Enter AR</button></div>
-<div id="input"><input id="msg" maxlength="30"><button id="send">Send</button></div>
-<div id="status">Ready</div>
-<script>
-const firebaseConfig={apiKey:"AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",authDomain:"hidden-memories-27f1a.firebaseapp.com",projectId:"hidden-memories-27f1a",storageBucket:"hidden-memories-27f1a.firebasestorage.app",messagingSenderId:"61920134607",appId:"1:61920134607:web:e62e0b4b3f947985b6beba"};firebase.initializeApp(firebaseConfig);const db=firebase.firestore();const col=db.collection('messages');
-let scene,camera,renderer,session,reticle,placed=false,hitTestSource,refSpace;
-const landing=document.getElementById('landing');const statusEl=document.getElementById('status');const input=document.getElementById('input');
-function init3D(){scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.01,20);renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.xr.enabled=true;document.body.appendChild(renderer.domElement);scene.add(new THREE.AmbientLight(0xffffff,1.5));reticle=new THREE.Mesh(new THREE.RingGeometry(.07,.09,32),new THREE.MeshBasicMaterial({color:0x00d4ff}));reticle.rotation.x=-Math.PI/2;reticle.visible=false;scene.add(reticle)}
-async function startAR(){try{if(typeof THREE==='undefined'){alert('Three.js failed to load');return;}if(!navigator.xr){alert('WebXR not supported');return;}landing.style.display='none';statusEl.textContent='Requesting AR';init3D();session=await navigator.xr.requestSession('immersive-ar',{optionalFeatures:['hit-test','local-floor']});renderer.xr.setSession(session);const viewer=await session.requestReferenceSpace('viewer');refSpace=await session.requestReferenceSpace('local');hitTestSource=await session.requestHitTestSource({space:viewer});session.addEventListener('end',()=>location.reload());renderer.setAnimationLoop(frame);statusEl.textContent='Tap floor to place';document.addEventListener('click',place);}catch(e){statusEl.textContent=e.message;landing.style.display='flex';}}
-function place(e){if(!reticle.visible||placed)return;placed=true;input.classList.add('show');statusEl.textContent='Placed';}
-function frame(t,frame){if(frame&&hitTestSource&&!placed){const hits=frame.getHitTestResults(hitTestSource);if(hits.length){const pose=hits[0].getPose(refSpace);reticle.visible=true;reticle.position.set(pose.transform.position.x,pose.transform.position.y,pose.transform.position.z);}}renderer.render(scene,camera)}
-document.getElementById('enter').onclick=startAR;
+
+<div id="landing">
+  <h1>hidden memories</h1>
+  <p>leave a word on the floor</p>
+  <button id="enter-btn">Enter AR</button>
+</div>
+
+<div id="ar-ui">
+  <div id="status">point at the floor, then tap</div>
+  <div id="input-row">
+    <input id="msg-input" type="text" maxlength="30" placeholder="write something…">
+    <button id="send-btn">↑</button>
+  </div>
+  <button id="exit-btn">exit</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* ── Firebase ── */
+const fbApp = initializeApp({
+  apiKey: "AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",
+  authDomain: "hidden-memories-27f1a.firebaseapp.com",
+  projectId: "hidden-memories-27f1a",
+  storageBucket: "hidden-memories-27f1a.firebasestorage.app",
+  messagingSenderId: "61920134607",
+  appId: "1:61920134607:web:e62e0b4b3f947985b6beba"
+});
+const db  = getFirestore(fbApp);
+const col = collection(db, "messages");
+
+/* ── DOM ── */
+const landing   = document.getElementById('landing');
+const arUI      = document.getElementById('ar-ui');
+const statusEl  = document.getElementById('status');
+const inputRow  = document.getElementById('input-row');
+const msgInput  = document.getElementById('msg-input');
+const sendBtn   = document.getElementById('send-btn');
+const exitBtn   = document.getElementById('exit-btn');
+const enterBtn  = document.getElementById('enter-btn');
+
+/* ── Three.js vars ── */
+let renderer, scene, camera;
+let session     = null;
+let refSpace    = null;
+let hitSource   = null;
+let reticle     = null;
+let squareGroup = null;
+let placed      = false;
+let messages    = [];
+let textMeshes  = [];
+
+/* ── Firestore listener ── */
+onSnapshot(col, snap => {
+  messages = snap.docs.map(d => d.data());
+  if (placed) rebuildTexts();
+});
+
+/* ── Send message ── */
+sendBtn.addEventListener('click', sendMessage);
+msgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+
+async function sendMessage() {
+  const text = msgInput.value.trim();
+  if (!text || !placed) return;
+  msgInput.value = '';
+  const slot = findSlot();
+  await addDoc(col, { text, x: slot.x, z: slot.z, createdAt: serverTimestamp() });
+}
+
+function findSlot() {
+  const cols = 5, rows = 5, cw = 1/cols, ch = 1/rows;
+  const used = new Set(messages.map(m => `${m.x},${m.z}`));
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = round(-0.5 + cw*c + cw/2);
+      const z = round(-0.5 + ch*r + ch/2);
+      if (!used.has(`${x},${z}`)) return {x, z};
+    }
+  }
+  return { x: round((Math.random()-0.5)*0.8), z: round((Math.random()-0.5)*0.8) };
+}
+const round = v => Math.round(v * 1000) / 1000;
+
+/* ── Init Three.js ── */
+function initThree() {
+  scene    = new THREE.Scene();
+  camera   = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.01, 20);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(devicePixelRatio);
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.xr.enabled = true;
+  renderer.setClearColor(0x000000, 0);  // transparent so camera shows through
+
+  renderer.domElement.style.position = 'fixed';
+  renderer.domElement.style.inset = '0';
+  renderer.domElement.style.zIndex = '1';
+  document.body.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+
+  /* Reticle */
+  reticle = new THREE.Group();
+  reticle.add(new THREE.Mesh(
+    new THREE.RingGeometry(0.07, 0.09, 32),
+    new THREE.MeshBasicMaterial({ color: 0x00d4ff, side: THREE.DoubleSide })
+  ));
+  reticle.add(new THREE.Mesh(
+    new THREE.CircleGeometry(0.015, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  ));
+  reticle.rotation.x = -Math.PI / 2;
+  reticle.visible = false;
+  scene.add(reticle);
+
+  /* Square */
+  squareGroup = new THREE.Group();
+  squareGroup.add(buildEdges());
+  squareGroup.position.y = 0.002;
+  squareGroup.visible = false;
+  scene.add(squareGroup);
+}
+
+function buildEdges() {
+  const g = new THREE.Group();
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(1, 1)),
+    new THREE.LineBasicMaterial({ color: 0x00d4ff })
+  );
+  edges.rotation.x = -Math.PI / 2;
+  g.add(edges);
+  return g;
+}
+
+/* ── Text meshes ── */
+function makeText(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 80;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 512, 80);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 30px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 40);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.18, 0.028),
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      transparent: true, side: THREE.DoubleSide, depthWrite: false
+    })
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+function rebuildTexts() {
+  textMeshes.forEach(m => squareGroup.remove(m));
+  textMeshes = [];
+  messages.forEach(msg => {
+    const m = makeText(msg.text);
+    m.position.set(msg.x, 0.003, msg.z);
+    squareGroup.add(m);
+    textMeshes.push(m);
+  });
+}
+
+/* ── Start AR ── */
+enterBtn.addEventListener('click', startAR);
+
+async function startAR() {
+  if (!navigator.xr) { alert('WebXR not available. Use Chrome on Android.'); return; }
+
+  const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
+  if (!supported) { alert('AR not supported on this device.'); return; }
+
+  initThree();
+  landing.style.display = 'none';
+  arUI.classList.add('active');
+  arUI.style.zIndex = '999';
+
+  try {
+    session = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['local-floor', 'dom-overlay'],
+      domOverlay: { root: document.body }
+    });
+
+    renderer.xr.setReferenceSpaceType('local');
+    await renderer.xr.setSession(session);
+    session.addEventListener('end', onEnd);
+
+    try {
+      refSpace = await session.requestReferenceSpace('local-floor');
+    } catch {
+      refSpace = await session.requestReferenceSpace('local');
+    }
+
+    hitSource = await session.requestHitTestSource({
+      space: await session.requestReferenceSpace('viewer')
+    });
+
+    document.addEventListener('click', onTap);
+    renderer.setAnimationLoop(onFrame);
+    statusEl.textContent = 'point at the floor, then tap';
+
+  } catch(e) {
+    alert('Error starting AR: ' + e.message);
+    onEnd();
+  }
+}
+
+/* ── Tap to place ── */
+function onTap(e) {
+  if (e.target.closest('#input-row') || e.target.closest('#exit-btn')) return;
+  if (!reticle.visible) return;
+
+  const pos = new THREE.Vector3();
+  reticle.getWorldPosition(pos);
+  squareGroup.position.set(pos.x, 0, pos.z);
+  squareGroup.visible = true;
+
+  if (!placed) {
+    placed = true;
+    rebuildTexts();
+    inputRow.classList.add('show');
+    statusEl.textContent = 'tap to move · type a memory';
+  }
+
+  reticle.visible = false;
+  setTimeout(() => { reticle.visible = true; }, 500);
+}
+
+/* ── Render loop ── */
+const _m4 = new THREE.Matrix4();
+
+function onFrame(t, frame) {
+  if (!frame || !hitSource) return;
+
+  const hits = frame.getHitTestResults(hitSource);
+  if (hits.length) {
+    const pose = hits[0].getPose(refSpace);
+    if (pose) {
+      reticle.visible = true;
+      _m4.fromArray(pose.transform.matrix);
+      reticle.position.setFromMatrixPosition(_m4);
+    }
+  } else {
+    reticle.visible = false;
+  }
+
+  renderer.render(scene, camera);
+}
+
+/* ── Exit ── */
+exitBtn.addEventListener('click', () => session?.end());
+
+function onEnd() {
+  session = null; placed = false; hitSource = null;
+  renderer.setAnimationLoop(null);
+  arUI.classList.remove('active');
+  inputRow.classList.remove('show');
+  landing.style.display = 'flex';
+  document.removeEventListener('click', onTap);
+  renderer.domElement?.parentNode?.removeChild(renderer.domElement);
+}
 </script>
 </body>
 </html>
